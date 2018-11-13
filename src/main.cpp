@@ -1035,11 +1035,11 @@ bool GetTransaction(const uint256 &hash, CTransaction &txOut, uint256 &hashBlock
                     fseek(file, postx.nTxOffset, SEEK_CUR);
                     file >> txOut;
                 } catch (std::exception &e) {
-                    return error("%s() : deserialize or I/O error", __PRETTY_FUNCTION__);
+                    return error("%s() : deserialize or I/O error", __FUNCTION__);
                 }
                 hashBlock = header.GetHash();
                 if (txOut.GetHash() != hash)
-                    return error("%s() : txid mismatch", __PRETTY_FUNCTION__);
+                    return error("%s() : txid mismatch", __FUNCTION__);
                 return true;
             }
         }
@@ -3173,7 +3173,7 @@ bool LoadExternalBlockFile(FILE* fileIn, CDiskBlockPos *dbp)
                         break;
                 }
             } catch (std::exception &e) {
-                printf("%s() : Deserialize or I/O error caught during load\n", __PRETTY_FUNCTION__);
+                printf("%s() : Deserialize or I/O error caught during load\n", __FUNCTION__);
             }
         }
         fclose(fileIn);
@@ -5487,11 +5487,15 @@ bool getGrantAwardsFromDatabaseForBlock(int64 nHeight){
         string filename = sstm.str();
         //printf("%s\n",filename.c_str());
         //mkdir((GetDataDir() / "grantawards").string().c_str());
+#ifdef _MSC_VER
+        boost::filesystem::create_directory(GetDataDir() / "grantawards");
+#else
         mkdir((GetDataDir() / "grantawards").string().c_str()
 #ifndef _WIN32
         ,S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH
 #endif
         );
+#endif
         grantAwardsOutput.open ((GetDataDir() / "grantawards" / filename).string().c_str(), ios::trunc);}
     //save to disk
 

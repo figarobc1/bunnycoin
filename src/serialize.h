@@ -6,6 +6,7 @@
 #ifndef BITCOIN_SERIALIZE_H
 #define BITCOIN_SERIALIZE_H
 
+#include <algorithm>
 #include <string>
 #include <vector>
 #include <map>
@@ -846,8 +847,9 @@ public:
         Init(nTypeIn, nVersionIn);
     }
 
-    CDataStream(const std::vector<unsigned char>& vchIn, int nTypeIn, int nVersionIn) : vch((char*)&vchIn.begin()[0], (char*)&vchIn.end()[0])
+    CDataStream(const std::vector<unsigned char>& vchIn, int nTypeIn, int nVersionIn) : vch(vchIn.size())
     {
+        std::copy(vchIn.begin(), vchIn.end(), vch.begin());
         Init(nTypeIn, nVersionIn);
     }
 

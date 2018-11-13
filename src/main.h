@@ -708,7 +708,7 @@ public:
 
     CTxOutCompressor(CTxOut &txoutIn) : txout(txoutIn) { }
 
-    IMPLEMENT_SERIALIZE(({
+    IMPLEMENT_SERIALIZE(([&]{
         if (!fRead) {
             uint64 nVal = CompressAmount(txout.nValue);
             READWRITE(VARINT(nVal));
@@ -719,7 +719,7 @@ public:
         }
         CScriptCompressor cscript(REF(txout.scriptPubKey));
         READWRITE(cscript);
-    });)
+    }());)
 };
 
 /** Undo information for a CTxIn
@@ -833,7 +833,7 @@ public:
             filein >> hashChecksum;
         }
         catch (std::exception &e) {
-            return error("%s() : deserialize or I/O error", __PRETTY_FUNCTION__);
+            return error("%s() : deserialize or I/O error", __FUNCTION__);
         }
 
         // Verify checksum
@@ -1486,7 +1486,7 @@ public:
             filein >> *this;
         }
         catch (std::exception &e) {
-            return error("%s() : deserialize or I/O error", __PRETTY_FUNCTION__);
+            return error("%s() : deserialize or I/O error", __FUNCTION__);
         }
 
         // Check the header
@@ -1830,7 +1830,7 @@ public:
 
 struct CBlockIndexWorkComparator
 {
-    bool operator()(CBlockIndex *pa, CBlockIndex *pb) {
+    bool operator()(CBlockIndex *pa, CBlockIndex *pb) const {
         if (pa->nChainWork > pb->nChainWork) return false;
         if (pa->nChainWork < pb->nChainWork) return true;
 

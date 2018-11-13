@@ -1,5 +1,10 @@
 add_subdirectory(leveldb)
 
+file(GLOB TS_FILES "qt/locale/*.ts")
+set_source_files_properties(${TS_FILES} PROPERTIES
+    OUTPUT_LOCATION "${CMAKE_CURRENT_SOURCE_DIR}/qt/locale")
+qt5_add_translation(QM_FILES ${TS_FILES})
+
 qt5_wrap_ui(UI_SOURCES
     qt/forms/aboutdialog.ui
     qt/forms/addressbookpage.ui
@@ -182,13 +187,38 @@ add_executable(bunnycoin-qt
     ${UI_SOURCES}
 )
 
-target_include_directories(bunnycoin-qt PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/qt)
-target_link_libraries(bunnycoin-qt PRIVATE leveldb ${CONAN_TARGETS})
+target_include_directories(bunnycoin-qt PRIVATE
+    src
+    src/qt
+)
+
+target_link_libraries(bunnycoin-qt PRIVATE
+    berkeleydb
+    Boost::chrono
+    Boost::filesystem
+    Boost::program_options
+    Boost::system
+    Boost::thread
+    leveldb
+    miniupnpc
+    OpenSSL::SSL
+    Qt5::Network
+    Qt5::Widgets
+    $<$<PLATFORM_ID:Windows>:gdi32>
+    $<$<PLATFORM_ID:Windows>:user32>
+)
+
 target_compile_definitions(bunnycoin-qt PRIVATE
     QT_GUI
     QT_DEPRECATED_WARNINGS
-    BOOST_THREAD_USE_LIB
-    BOOST_SPIRIT_THREADSAFE
+#    BOOST_THREAD_USE_LIB
+#    BOOST_SPIRIT_THREADSAFE
+    $<$<PLATFORM_ID:Windows>:WIN32>
+    $<$<PLATFORM_ID:Windows>:WIN32_LEAN_AND_MEAN>
+    $<$<PLATFORM_ID:Windows>:NOMINMAX>
+    $<$<CXX_COMPILER_ID:MSVC>:_CRT_SECURE_NO_WARNINGS>
+    $<$<CXX_COMPILER_ID:MSVC>:_SCL_SECURE_NO_WARNINGS>
+    USE_UPNP
 )
 
 if (UNIX)

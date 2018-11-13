@@ -2,7 +2,7 @@
 #define VOTECOINSDIALOG_H
 
 #include <QDialog>
-#include <sendcoinsdialog.h>
+#include "sendcoinsdialog.h"
 
 namespace Ui {
     class VoteCoinsDialog;

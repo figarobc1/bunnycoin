@@ -16,6 +16,14 @@
 #include <boost/algorithm/string/case_conv.hpp> // for to_lower()
 #include <boost/algorithm/string/predicate.hpp> // for startswith() and endswith()
 
+#ifdef _MSC_VER
+#ifdef _WIN64
+#define ssize_t int64_t
+#else
+#define ssize_t int32_t
+#endif
+#endif
+
 using namespace std;
 
 // Settings

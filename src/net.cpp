@@ -1248,10 +1248,10 @@ void ThreadDNSAddressSeed()
 
 
 
-unsigned int pnSeed[] =
-{
+//unsigned int pnSeed[] =
+//{
 //    0x92B9B572, 0xA2F3716E, 0x5F551D90
-};
+//};
 
 void DumpAddresses()
 {
@@ -1318,19 +1318,19 @@ void ThreadOpenConnections()
         if (addrman.size()==0 && (GetTime() - nStart > 60) && !fTestNet)
         {
             std::vector<CAddress> vAdd;
-            for (unsigned int i = 0; i < ARRAYLEN(pnSeed); i++)
-            {
-                // It'll only connect to one or two seed nodes because once it connects,
-                // it'll get a pile of addresses with newer timestamps.
-                // Seed nodes are given a random 'last seen time' of between one and two
-                // weeks ago.
-                const int64 nOneWeek = 7*24*60*60;
-                struct in_addr ip;
-                memcpy(&ip, &pnSeed[i], sizeof(ip));
-                CAddress addr(CService(ip, GetDefaultPort()));
-                addr.nTime = GetTime()-GetRand(nOneWeek)-nOneWeek;
-                vAdd.push_back(addr);
-            }
+//            for (unsigned int i = 0; i < ARRAYLEN(pnSeed); i++)
+//            {
+//                // It'll only connect to one or two seed nodes because once it connects,
+//                // it'll get a pile of addresses with newer timestamps.
+//                // Seed nodes are given a random 'last seen time' of between one and two
+//                // weeks ago.
+//                const int64 nOneWeek = 7*24*60*60;
+//                struct in_addr ip;
+//                memcpy(&ip, &pnSeed[i], sizeof(ip));
+//                CAddress addr(CService(ip, GetDefaultPort()));
+//                addr.nTime = GetTime()-GetRand(nOneWeek)-nOneWeek;
+//                vAdd.push_back(addr);
+//            }
             addrman.Add(vAdd, CNetAddr("127.0.0.1"));
         }
 
