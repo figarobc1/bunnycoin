@@ -303,7 +303,6 @@ I ReadVarInt(Stream& is)
     }
 }
 
-#define FLATDATA(obj)  REF(CFlatData((char*)&(obj), (char*)&(obj) + sizeof(obj)))
 #define VARINT(obj)    REF(WrapVarInt(REF(obj)))
 
 /** Wrapper for serializing arrays and POD.
@@ -311,30 +310,37 @@ I ReadVarInt(Stream& is)
 class CFlatData
 {
 protected:
-    char* pbegin;
-    char* pend;
+    char* data;
+    std::size_t size;
 public:
-    CFlatData(void* pbeginIn, void* pendIn) : pbegin((char*)pbeginIn), pend((char*)pendIn) { }
-    char* begin() { return pbegin; }
-    const char* begin() const { return pbegin; }
-    char* end() { return pend; }
-    const char* end() const { return pend; }
+    CFlatData(char* dataIn, std::size_t sizeIn) : data(dataIn), size(sizeIn) { }
+
+    explicit CFlatData(std::vector<char> &vec) : data(vec.data()), size(vec.size()) {}
+
+    template<std::size_t N>
+    explicit CFlatData(char (&arr)[N]) : data(arr), size(N) {}
+
+    template<typename T>
+    explicit CFlatData(std::vector<T> &vec) : data(reinterpret_cast<char*>(vec.data())), size(sizeof(T) * vec.size()) {}
+
+    template<typename T, std::size_t N>
+    explicit CFlatData(T (&arr)[N]) : data(const_cast<char*>(reinterpret_cast<const char*>(arr))), size(sizeof(T) * N) {}
 
     unsigned int GetSerializeSize(int, int=0) const
     {
-        return pend - pbegin;
+        return static_cast<unsigned int>(size);
     }
 
     template<typename Stream>
     void Serialize(Stream& s, int, int=0) const
     {
-        s.write(pbegin, pend - pbegin);
+        s.write(data, size);
     }
 
     template<typename Stream>
     void Unserialize(Stream& s, int, int=0)
     {
-        s.read(pbegin, pend - pbegin);
+        s.read(data, size);
     }
 };
 

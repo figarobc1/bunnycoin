@@ -83,7 +83,7 @@ class CNetAddr
 
         IMPLEMENT_SERIALIZE
             (
-             READWRITE(FLATDATA(ip));
+             READWRITE(CFlatData(ip));
             )
 };
 
@@ -124,7 +124,7 @@ class CService : public CNetAddr
         IMPLEMENT_SERIALIZE
             (
              CService* pthis = const_cast<CService*>(this);
-             READWRITE(FLATDATA(ip));
+             READWRITE(CFlatData(ip));
              unsigned short portN = htons(port);
              READWRITE(portN);
              if (fRead)

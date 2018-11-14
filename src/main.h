@@ -288,7 +288,7 @@ public:
 
     COutPoint() { SetNull(); }
     COutPoint(uint256 hashIn, unsigned int nIn) { hash = hashIn; n = nIn; }
-    IMPLEMENT_SERIALIZE( READWRITE(FLATDATA(*this)); )
+    IMPLEMENT_SERIALIZE( READWRITE(CFlatData(reinterpret_cast<char*>(const_cast<COutPoint*>(this)), sizeof(COutPoint))); )
     void SetNull() { hash = 0; n = (unsigned int) -1; }
     bool IsNull() const { return (hash == 0 && n == (unsigned int) -1); }
 
@@ -796,7 +796,7 @@ public:
 
         // Write index header
         unsigned int nSize = fileout.GetSerializeSize(*this);
-        fileout << FLATDATA(pchMessageStart) << nSize;
+        fileout << CFlatData(pchMessageStart) << nSize;
 
         // Write undo data
         long fileOutPos = ftell(fileout);
@@ -1455,7 +1455,7 @@ public:
 
         // Write index header
         unsigned int nSize = fileout.GetSerializeSize(*this);
-        fileout << FLATDATA(pchMessageStart) << nSize;
+        fileout << CFlatData(pchMessageStart) << nSize;
 
         // Write block
         long fileOutPos = ftell(fileout);

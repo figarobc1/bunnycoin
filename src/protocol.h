@@ -42,8 +42,8 @@ class CMessageHeader
 
         IMPLEMENT_SERIALIZE
             (
-             READWRITE(FLATDATA(pchMessageStart));
-             READWRITE(FLATDATA(pchCommand));
+             READWRITE(CFlatData(pchMessageStart));
+             READWRITE(CFlatData(pchCommand));
              READWRITE(nMessageSize);
              READWRITE(nChecksum);
             )

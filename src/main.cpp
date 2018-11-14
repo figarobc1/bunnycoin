@@ -3142,7 +3142,7 @@ bool LoadExternalBlockFile(FILE* fileIn, CDiskBlockPos *dbp)
                 unsigned char buf[4];
                 blkdat.FindByte(pchMessageStart[0]);
                 nRewind = blkdat.GetPos()+1;
-                blkdat >> FLATDATA(buf);
+                blkdat >> CFlatData(buf);
                 if (memcmp(buf, pchMessageStart, 4))
                     continue;
                 // read size
