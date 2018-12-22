@@ -2,6 +2,8 @@
 // Copyright (c) 2009-2012 The Bitcoin developers
 // Copyright (c) 2011-2014 Litecoin Developers
 // Copyright (c) 2013-2014 Dogecoin Developers
+// Copyright (c) 2009-2017 The DigiByte Core developers
+// Copyright (c) 2018 Bunnycoin Developers
 // Contributions by /u/lleti, rog1121, and DigiByte (DigiShield Developers).
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
@@ -1262,22 +1264,209 @@ unsigned int ComputeMinWork(unsigned int nBase, int64 nTime)
     return bnResult.GetCompact();
 }
 
+const int NUM_ALGOS = 1;
+
+namespace Consensus {
+
+/**
+ * Parameters that influence chain consensus.
+ */
+struct Params {
+    /** Proof of work parameters */
+    CBigNum powLimit;
+    bool fPowAllowMinDifficultyBlocks;
+
+    int64 nTargetTimespan;
+    int64 nTargetSpacing;
+    int64 nInterval;
+
+    int64_t nAveragingInterval;
+    int64_t multiAlgoTargetSpacingV4;
+    int64_t nAveragingTargetTimespanV4;
+
+    int64_t nMaxAdjustDownV4;
+    int64_t nMaxAdjustUpV4;
+
+    int64_t nMinActualTimespanV1;
+    int64_t nMaxActualTimespanV1;
+    int64_t nMinActualTimespanV2;
+    int64_t nMaxActualTimespanV2;
+    int64_t nMinActualTimespanV3;
+    int64_t nMaxActualTimespanV3;
+    int64_t nMinActualTimespanV4;
+    int64_t nMaxActualTimespanV4;
+
+    int64_t nLocalTargetAdjustment;
+};
+} // namespace Consensus
+
+inline unsigned int PowLimit(const Consensus::Params& params)
+{
+    return CBigNum(params.powLimit).GetCompact();
+}
+
+const CBlockIndex* GetLastBlockIndexForAlgo(const CBlockIndex* pindex, const Consensus::Params& params, int algo)
+{
+    for (; pindex; pindex = pindex->pprev)
+    {
+        if (pindex->GetAlgo() != algo)
+            continue;
+        // ignore special min-difficulty testnet blocks
+        if (params.fPowAllowMinDifficultyBlocks &&
+            pindex->pprev &&
+            pindex->nTime > pindex->pprev->nTime + params.nTargetSpacing*2)
+        {
+            continue;
+        }
+        return pindex;
+    }
+    return nullptr;
+}
 
 // Bunnycoin
 
+unsigned int GetNextWorkRequiredV1_V3(
+        const CBlockIndex* pindexLast,
+        const Consensus::Params& params,
+        int64_t nMinActualTimespan,
+        int64_t nMaxActualTimespan)
+{
+    // Bunnycoin: This fixes an issue where a 51% attack can change difficulty at will.
+    // Go back the full period unless it's the first retarget after genesis. Code courtesy of Art Forz
+    int64 blockstogoback = params.nInterval-1;
+    if ((pindexLast->nHeight+1) != params.nInterval)
+        blockstogoback = params.nInterval;
+
+    // Go back by what we want to be 14 days worth of blocks
+    const CBlockIndex* pindexFirst = pindexLast;
+    for (int64 i = 0; pindexFirst && i < blockstogoback; i++)
+        pindexFirst = pindexFirst->pprev;
+    assert(pindexFirst);
+
+    // Limit adjustment step
+    int64 nActualTimespan = pindexLast->GetBlockTime() - pindexFirst->GetBlockTime();
+    printf("  nActualTimespan = %" PRI64d "  before bounds\n", nActualTimespan);
+
+    if (nActualTimespan < nMinActualTimespan)
+        nActualTimespan = nMinActualTimespan;
+    if (nActualTimespan > nMaxActualTimespan)
+        nActualTimespan = nMaxActualTimespan;
+
+    // Retarget
+    CBigNum bnNew;
+    bnNew.SetCompact(pindexLast->nBits);
+    bnNew *= nActualTimespan;
+    bnNew /= params.nTargetTimespan;
+
+    if (bnNew > params.powLimit)
+        bnNew = params.powLimit;
+
+    /// debug print
+    printf("GetNextWorkRequired RETARGET\n");
+    printf("nTargetTimespan = %" PRI64d "    nActualTimespan = %" PRI64d "\n", params.nTargetTimespan, nActualTimespan);
+    printf("Before: %08x  %s\n", pindexLast->nBits, CBigNum().SetCompact(pindexLast->nBits).getuint256().ToString().c_str());
+    printf("After:  %08x  %s\n", bnNew.GetCompact(), bnNew.getuint256().ToString().c_str());
+
+    return bnNew.GetCompact();
+}
+
+unsigned int GetNextWorkRequiredV4(const CBlockIndex* pindexLast, const Consensus::Params& params, int algo = 1)
+{
+    // find first block in averaging interval
+    // Go back by what we want to be nAveragingInterval blocks per algo
+    const CBlockIndex* pindexFirst = pindexLast;
+    for (int i = 0; pindexFirst && i < NUM_ALGOS*params.nAveragingInterval; i++)
+    {
+        pindexFirst = pindexFirst->pprev;
+    }
+
+    const CBlockIndex* pindexPrevAlgo = GetLastBlockIndexForAlgo(pindexLast, params, algo);
+    if (pindexPrevAlgo == nullptr || pindexFirst == nullptr)
+    {
+        return PowLimit(params);
+    }
+
+    // Limit adjustment step
+    // Use medians to prevent time-warp attacks
+    int64_t nActualTimespan = pindexLast-> GetMedianTimePast() - pindexFirst->GetMedianTimePast();
+    nActualTimespan = params.nAveragingTargetTimespanV4 + (nActualTimespan - params.nAveragingTargetTimespanV4)/4;
+
+    if (nActualTimespan < params.nMinActualTimespanV4)
+        nActualTimespan = params.nMinActualTimespanV4;
+    if (nActualTimespan > params.nMaxActualTimespanV4)
+        nActualTimespan = params.nMaxActualTimespanV4;
+
+    //Global retarget
+    CBigNum bnNew;
+    bnNew.SetCompact(pindexPrevAlgo->nBits);
+
+    bnNew *= nActualTimespan;
+    bnNew /= params.nAveragingTargetTimespanV4;
+
+    //Per-algo retarget
+    int nAdjustments = pindexPrevAlgo->nHeight + NUM_ALGOS - 1 - pindexLast->nHeight;
+    if (nAdjustments > 0)
+    {
+        for (int i = 0; i < nAdjustments; i++)
+        {
+            bnNew *= 100;
+            bnNew /= (100 + params.nLocalTargetAdjustment);
+        }
+    }
+    else if (nAdjustments < 0)//make it easier
+    {
+        for (int i = 0; i < -nAdjustments; i++)
+        {
+            bnNew *= (100 + params.nLocalTargetAdjustment);
+            bnNew /= 100;
+        }
+    }
+
+    if (bnNew > params.powLimit)
+        bnNew = params.powLimit;
+
+    /// debug print
+    printf("GetNextWorkRequired RETARGET\n");
+    printf("nAveragingTargetTimespanV4 = %" PRI64d "    nActualTimespan = %" PRI64d "\n", params.nAveragingTargetTimespanV4, nActualTimespan);
+    printf("Before: %08x  %s\n", pindexLast->nBits, CBigNum().SetCompact(pindexLast->nBits).getuint256().ToString().c_str());
+    printf("After:  %08x  %s\n", bnNew.GetCompact(), bnNew.getuint256().ToString().c_str());
+
+    return bnNew.GetCompact();
+}
+
 unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHeader *pblock)
 {
-    unsigned int nProofOfWorkLimit = bnProofOfWorkLimit.GetCompact();
+    Consensus::Params params;
+    params.powLimit = bnProofOfWorkLimit;
+    params.fPowAllowMinDifficultyBlocks = fTestNet;
+    params.nTargetTimespan = nTargetTimespan;
+    params.nInterval = nInterval;
+    params.nAveragingInterval = 10;
+    params.multiAlgoTargetSpacingV4 = 15 * NUM_ALGOS; // NUM_ALGOS * 15 seconds
+    params.nAveragingTargetTimespanV4 = params.nAveragingInterval * params.multiAlgoTargetSpacingV4;
+    params.nMaxAdjustUpV4 = 8; // 8% adjustment up
+    params.nMaxAdjustDownV4 = 16; // 16% adjustment down
+    params.nMinActualTimespanV1 = params.nTargetTimespan/16;
+    params.nMaxActualTimespanV1 = params.nTargetTimespan*4;
+    params.nMinActualTimespanV2 = params.nTargetTimespan/8;
+    params.nMaxActualTimespanV2 = params.nTargetTimespan*4;
+    params.nMinActualTimespanV3 = params.nTargetTimespan/4;
+    params.nMaxActualTimespanV3 = params.nTargetTimespan*4;
+    params.nMinActualTimespanV4 = params.nAveragingTargetTimespanV4 * (100 - params.nMaxAdjustUpV4) / 100;
+    params.nMaxActualTimespanV4 = params.nAveragingTargetTimespanV4 * (100 + params.nMaxAdjustDownV4) / 100;
+    params.nLocalTargetAdjustment = 4; //target adjustment per algo
+
+    const unsigned int nProofOfWorkLimit = PowLimit(params);
 
     // Genesis block
-    if (pindexLast == NULL)
+    if (pindexLast == nullptr)
         return nProofOfWorkLimit;
 
     // Only change once per interval
     if ((pindexLast->nHeight+1) % nInterval != 0)
     {
         // Special difficulty rule for testnet:
-        if (fTestNet)
+        if (params.fPowAllowMinDifficultyBlocks)
         {
             // If the new block's timestamp is more than 2* nTargetSpacing minutes
             // then allow mining of a min-difficulty block.
@@ -1296,61 +1485,15 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
         return pindexLast->nBits;
     }
 
-    // Bunnycoin: This fixes an issue where a 51% attack can change difficulty at will.
-    // Go back the full period unless it's the first retarget after genesis. Code courtesy of Art Forz
-    int blockstogoback = nInterval-1;
-    if ((pindexLast->nHeight+1) != nInterval)
-        blockstogoback = nInterval;
-
-    // Go back by what we want to be 14 days worth of blocks
-    const CBlockIndex* pindexFirst = pindexLast;
-    for (int i = 0; pindexFirst && i < blockstogoback; i++)
-        pindexFirst = pindexFirst->pprev;
-    assert(pindexFirst);
-
-    // Limit adjustment step
-    int64 nActualTimespan = pindexLast->GetBlockTime() - pindexFirst->GetBlockTime();
-    printf("  nActualTimespan = %" PRI64d "  before bounds\n", nActualTimespan);
-    if(pindexLast->nHeight+1 > 10000)
-    {
-        if (nActualTimespan < nTargetTimespan/4)
-            nActualTimespan = nTargetTimespan/4;
-        if (nActualTimespan > nTargetTimespan*4)
-            nActualTimespan = nTargetTimespan*4;
-    }
-    else if(pindexLast->nHeight+1 > 5000)
-    {
-        if (nActualTimespan < nTargetTimespan/8)
-            nActualTimespan = nTargetTimespan/8;
-        if (nActualTimespan > nTargetTimespan*4)
-            nActualTimespan = nTargetTimespan*4;
-    }
+    if (pindexLast->nHeight < 5000)
+        return GetNextWorkRequiredV1_V3(pindexLast, params, params.nMinActualTimespanV1, params.nMaxActualTimespanV1);
+    else if (pindexLast->nHeight < 10000)
+        return GetNextWorkRequiredV1_V3(pindexLast, params, params.nMinActualTimespanV2, params.nMaxActualTimespanV2);
+    else if(pindexLast->nHeight < 2000000)
+        return GetNextWorkRequiredV1_V3(pindexLast, params, params.nMinActualTimespanV3, params.nMaxActualTimespanV3);
     else
-    {
-        if (nActualTimespan < nTargetTimespan/16)
-            nActualTimespan = nTargetTimespan/16;
-        if (nActualTimespan > nTargetTimespan*4)
-            nActualTimespan = nTargetTimespan*4;
-    }
-
-    // Retarget
-    CBigNum bnNew;
-    bnNew.SetCompact(pindexLast->nBits);
-    bnNew *= nActualTimespan;
-    bnNew /= nTargetTimespan;
-
-    if (bnNew > bnProofOfWorkLimit)
-        bnNew = bnProofOfWorkLimit;
-
-    /// debug print
-    printf("GetNextWorkRequired RETARGET\n");
-    printf("nTargetTimespan = %" PRI64d "    nActualTimespan = %" PRI64d "\n", nTargetTimespan, nActualTimespan);
-    printf("Before: %08x  %s\n", pindexLast->nBits, CBigNum().SetCompact(pindexLast->nBits).getuint256().ToString().c_str());
-    printf("After:  %08x  %s\n", bnNew.GetCompact(), bnNew.getuint256().ToString().c_str());
-
-    return bnNew.GetCompact();
+        return GetNextWorkRequiredV4(pindexLast, params);
 }
-
 
 bool CheckProofOfWork(uint256 hash, unsigned int nBits)
 {
