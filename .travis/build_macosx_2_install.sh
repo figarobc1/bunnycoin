@@ -7,5 +7,5 @@
 
 export LC_ALL=C.UTF-8
 
-brew upgrade boost cmake openssl || true
+brew upgrade boost cmake openssl@1.1 || true
 brew install qrencode miniupnpc qt berkeley-db ninja || true
