@@ -1835,7 +1835,7 @@ public:
 
     int GetAlgo() const
     {
-        return 0;
+        return 1;
     }
 };
 

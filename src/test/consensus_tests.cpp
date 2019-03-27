@@ -138,4 +138,41 @@ BOOST_AUTO_TEST_CASE(nextworkrequired_retarget_v3)
     BOOST_CHECK_EQUAL(GetNextWorkRequired(&blockIndexes[720], &header), (bn*4).GetCompact());
 }
 
+BOOST_AUTO_TEST_CASE(nextworkrequired_retarget_v4)
+{
+    CBlockHeader header;
+
+    std::vector<CBlockIndex> blockIndexes(1000);
+    for (std::size_t i = 0; i < blockIndexes.size(); ++i) {
+        blockIndexes[i].nHeight = 2000159+i;
+        if (i > 0) {
+            blockIndexes[i-1].pnext = &blockIndexes[i];
+            blockIndexes[i].pprev = &blockIndexes[i-1];
+        }
+    }
+
+    const CBigNum bn(1000);
+
+    for (std::size_t i = 1; i <= 240; ++i) {
+        blockIndexes[i].nTime = i;
+        blockIndexes[i].nBits = bn.GetCompact();
+    }
+
+    BOOST_CHECK_EQUAL(GetNextWorkRequired(&blockIndexes[240], &header), (bn * 150 * (100 - 8) / 100 / 150).GetCompact());
+
+    for (std::size_t i = 241; i <= 480; ++i) {
+        blockIndexes[i].nTime = i*10;
+        blockIndexes[i].nBits = bn.GetCompact();
+    }
+
+    BOOST_CHECK_EQUAL(GetNextWorkRequired(&blockIndexes[480], &header), (bn*(150+(100-150)/4)/150).GetCompact());
+
+    for (std::size_t i = 481; i <= 720; ++i) {
+        blockIndexes[i].nTime = i*1000;
+        blockIndexes[i].nBits = bn.GetCompact();
+    }
+
+    BOOST_CHECK_EQUAL(GetNextWorkRequired(&blockIndexes[720], &header), (bn * 150 * (100 + 16) / 100 / 150).GetCompact());
+}
+
 BOOST_AUTO_TEST_SUITE_END()
